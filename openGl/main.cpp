@@ -146,7 +146,7 @@ int main() {
     Model cottageModel(filesystem::path("assets/cottage/cottage.obj"));
     Model treeModel(filesystem::path("assets/tree/Tree.obj"));
     Model mountainModel(filesystem::path("assets/mountain/mountainpeak.obj"));
-    Model moonModel(filesystem::path("assets/moon.obj"));
+    Model moonModel(filesystem::path("assets/moon/moon.obj"));
     Model campfireModel(filesystem::path("assets/campfire/campfire.obj"));
     Model reindeerModel(filesystem::path("assets/reindeer/reindeer.obj"));
 
