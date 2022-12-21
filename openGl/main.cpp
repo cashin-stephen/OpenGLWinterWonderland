@@ -9,6 +9,8 @@
 #include "class/Shader.h"
 #include "class/Camera.h"
 #include "class/Model.h"
+#include "class/ParticleGroup.h"
+
 #include <iostream>
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -33,7 +35,8 @@ float lastFrame = 0.0f;
 glm::vec3 lightPos(12.0f, 20.0f, 0.0f);
 glm::vec3 moonlight(0.5f, 0.5f, 0.6f);
 glm::vec3 campfirePos(0.0f, 1.0f, -4.5f);
-//glm::vec3 moonlight(1.0f, 1.0f, 1.0f);
+glm::vec3 fireColor(1.0f, 1.0f, 0.0f);
+glm::vec3 particlePos(-0.3f, -0.8f, -4.85f);
 
 unsigned int getTexture(const char* path){
 
@@ -102,7 +105,9 @@ int main() {
     // tell GL to only draw onto a pixel if the shape is closer to the viewer
     glEnable(GL_DEPTH_TEST); // enable depth-testing
     glDepthFunc(GL_LESS); // depth-testing interprets a smaller value as "closer"
-
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    
     float groundVertices[] {
         0.5f,  0.5f, 0.0f, 1.0f, 1.0f,  // top right
         0.5f, -0.5f, 0.0f, 1.0f, 0.0f, // bottom right
@@ -141,7 +146,7 @@ int main() {
     Shader groundShader("groundvs.txt", "groundfs.txt");
     Shader modelShader("modelvs.txt", "modelfs.txt");
     Shader moonShader("moonvs.txt", "moonfs.txt");
-    Shader fireShader("firevs.txt", "firefs.txt");
+    Shader particleShader("particlevs.txt", "particlefs.txt");
 
     Model cottageModel(filesystem::path("assets/cottage/cottage.obj"));
     Model treeModel(filesystem::path("assets/tree/Tree.obj"));
@@ -154,12 +159,13 @@ int main() {
     unsigned int moonTexture = getTexture("textures/moon.jpg");
     unsigned int snowyMountain = getTexture("textures/snowyMountain.jpeg");
 
-    groundShader.setInt("texture", 0);
+    ParticleGroup particleGroup(fireColor, particlePos, 50);
 
     while(!glfwWindowShouldClose(window)) {
         //background colours
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
 
         //camera Movement
         float currentFrame = static_cast<float>(glfwGetTime());
@@ -184,17 +190,6 @@ int main() {
         model = glm::translate(model, lightPos);
         moonShader.setMat4("model", model);
         moonModel.Draw(modelShader);
-
-        fireShader.use();
-        fireShader.setMat4("projection", projection);    
-        fireShader.setMat4("view", view);
-
-        model = glm::mat4(1.0f);
-        model = glm::translate(model, campfirePos);
-        model = glm::translate(model, glm::vec3(-0.1f, -2.0f, -0.1f));
-        model = glm::scale(model, glm::vec3(0.22f, 0.2f, 0.22f));
-        fireShader.setMat4("model", model);
-        moonModel.Draw(fireShader);
 
         glm::vec3 diffuseColor = moonlight * glm::vec3(1.0f);
         glm::vec3 ambientColor = diffuseColor * glm::vec3(0.9f);
@@ -232,7 +227,7 @@ int main() {
         modelShader.setMat4("model", model);
         campfireModel.Draw(modelShader);
 
-        //reindeer material Properties
+        //reindeer material Properties //12 Meshes
         modelShader.setVec3("material.ambient", 0.2f, 0.2f, 0.2f);
         modelShader.setVec3("material.diffuse", 0.5f, 0.5f, 0.5f);
         modelShader.setVec3("material.specular", 0.1f, 0.1f, 0.1f); // specular lighting doesn't have full effect on this object's material
@@ -246,8 +241,18 @@ int main() {
             model = glm::rotate(model, glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
             model = glm::rotate(model, glm::radians(180.0f), glm::vec3(0.0f, 0.0f, 1.0f));
             model = glm::rotate(model, ((float)glfwGetTime()+i)/2, glm::vec3(0.0f, 0.0f, -1.0f));
+
+            // glm::mat4 childModel = glm::mat4(1.0f);
             modelShader.setMat4("model", model);
-            reindeerModel.Draw(modelShader);
+            reindeerModel.meshes[0].Draw(modelShader);
+            model = glm::translate(model, glm::vec3(-cos(((float)glfwGetTime()+i)/2)*3.5, 0.0f, sin(((float)glfwGetTime()+i)/2)*3.5));
+            modelShader.setMat4("model", model);
+            
+            for(unsigned int i = 1; i < reindeerModel.meshes.size(); i++) {
+                reindeerModel.meshes[i].Draw(modelShader);
+            }
+            
+            // reindeerModel.Draw(modelShader);
         }
 
         // tree material properties
@@ -414,6 +419,14 @@ int main() {
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
         glBindVertexArray(0);
 
+        //drawing particle, right now just a big cube
+
+        particleShader.use();
+        
+        particleShader.setMat4("view", view);
+        particleShader.setMat4("projection", projection);
+
+        particleGroup.Draw(particleShader);
         glfwSwapBuffers(window);
         glfwPollEvents();
 }

@@ -1,0 +1,20 @@
+#version 330 core
+out vec4 FragColor;
+
+in vec3 vertexColor;
+in float lstrength;
+
+void main()
+{
+    if(lstrength>0) {
+        vec3 greenStrength = vec3(1.0f, lstrength, 1.0f);
+        FragColor =  vec4((greenStrength * vertexColor), (lstrength*(1.0f)+0.5f));
+    }
+    else if(lstrength > -0.5) {
+        FragColor = vec4( (lstrength*-1) * (vec3(1.0f,1.0f,1.0f)), ((lstrength+0.5f)*1.0f) );
+    }
+    else {
+        FragColor = vec4(0.3f,0.3f,0.3f, 0.3f);
+    }
+    
+}
