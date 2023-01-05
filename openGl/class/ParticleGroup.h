@@ -21,13 +21,9 @@ public:
         this->pos = pos;
         this->numParticles = numParticles;
         maxParticles = false;
-        // for (unsigned int i = 0; i < numParticles; i++) {
-        //     Particle particle(color, pos);
-        //     particles.push_back(particle);
-        // }
     }
 
-    void Draw(Shader &shader) {
+    void Draw(Shader &shader, bool cameraEnabled, float timeBeforePause) {
         if(maxParticles == false) {
             for (unsigned int i = 0; i < numParticles; i++) {
                 Particle particle(color, pos);
@@ -41,7 +37,7 @@ public:
                 maxParticles = true;
             }
             else {
-                particles[i].Draw(shader);
+                particles[i].Draw(shader, cameraEnabled, timeBeforePause);
             }
             
         }

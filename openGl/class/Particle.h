@@ -24,8 +24,6 @@ public:
         this->pos = pos;
         this->color = color;
         
-        // modulo value givees full range of possible values
-        // divisor scales down size
         int spawnRange = 1000;
         float sizeDivisor = 2000.0f;
         float size = ((float)spawnRange)/sizeDivisor;
@@ -46,13 +44,21 @@ public:
         setUp();
     }
 
-    void Draw(Shader &shader) 
+    void Draw(Shader &shader, bool cameraEnabled, float timeBeforePause) 
     {
         glm::mat4 model = glm::mat4(1.0f);
         model = glm::translate(model, pos);
         model = glm::translate(model, offset);
-        model = glm::translate(model, glm::vec3(0.0f, ((float)glfwGetTime()-birthTime)/20, 0.0f));
-        model = glm::rotate(model, (float)glfwGetTime()*3, glm::vec3(1.0f,0.5f, 0.3f));
+        if(cameraEnabled == true) {
+            model = glm::translate(model, glm::vec3(0.0f, ((float)glfwGetTime()-birthTime)/20, 0.0f));
+            model = glm::rotate(model, (float)glfwGetTime()*3, glm::vec3(1.0f,0.5f, 0.3f));
+            life-=4;
+        }
+        else {
+            model = glm::translate(model, glm::vec3(0.0f, (timeBeforePause-birthTime)/20, 0.0f));
+            model = glm::rotate(model, timeBeforePause*3, glm::vec3(1.0f,0.5f, 0.3f));
+        }
+
         
         lightStrength = (float)(life+100)/300;
 
@@ -63,7 +69,6 @@ public:
         glBindVertexArray(VAO);
         glDrawArrays(GL_TRIANGLES, 0, 36);
         glBindVertexArray(0);
-        life-=4;
     }
 
 private:
