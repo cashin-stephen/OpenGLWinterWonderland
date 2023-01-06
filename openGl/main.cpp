@@ -569,7 +569,8 @@ void highlightObject(glm::mat4 model, Model object, Shader shader, float scale, 
     object.Draw(borderShader);
     glStencilMask(0xFF);
     glStencilFunc(GL_ALWAYS, 1, 0xFF);   
-    glEnable(GL_DEPTH_TEST);  
+    glEnable(GL_DEPTH_TEST); d 
+
 }
 
 bool intersection(glm::vec3 center, float radius, glm::vec3 ray) {
