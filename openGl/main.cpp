@@ -11,7 +11,6 @@
 #include "class/Camera.h"
 #include "class/Model.h"
 #include "class/ParticleGroup.h"
-#include "class/MousePicker.h"
 
 #include <iostream>
 #include <vector>
@@ -26,18 +25,13 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 bool intersection(glm::vec3 center, float radius, glm::vec3 ray);
 int objectIntersection(glm::vec3 ray);
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods);
+void highlightObject(glm::mat4 model, Model object, Shader shader, float scale, Shader borderShader);
 
 const unsigned int SCR_WIDTH = 640;
 const unsigned int SCR_HEIGHT = 480;
-const unsigned int REINDEER1 = 1;
-const unsigned int REINDEER2 = 2;
-const unsigned int REINDEER3 = 3;
-const unsigned int REINDEER4 = 4;
 const unsigned int MOON = 5;
 const unsigned int CAMPFIRE = 6;
-const unsigned int TREE = 7;
 const unsigned int CABIN = 8;
-const unsigned int MOUNTAIN = 9;
 
 bool cameraEnabled = true;
 bool firstMouse = true;
@@ -53,25 +47,21 @@ bool moonIntersection;
 int interSectedObject =0;
 vector<glm::vec3> reindeerPos;
 glm::vec3 lightPos(12.0f, 20.0f, 0.0f);
+glm::vec3 cottagePos(0.0f,-1.0f, 11.5f);
 glm::vec3 moonlight(0.5f, 0.5f, 0.6f);
 glm::vec3 campfirePos(0.0f, 1.0f, -4.5f);
 glm::vec3 fireColor(1.0f, 1.0f, 0.0f);
 glm::vec3 particlePos(-0.3f, -0.8f, -4.85f);
 
 unsigned int getTexture(const char* path){
-
     unsigned int texture;
     glGenTextures(1, &texture);
-    glBindTexture(GL_TEXTURE_2D, texture); // all upcoming GL_TEXTURE_2D operations now have effect on this texture object
-    // set the texture wrapping parameters
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	// set texture wrapping to GL_REPEAT (default wrapping method)
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    // set texture filtering parameters
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    // load image, create texture and generate mipmaps
     int width, height, nrChannels;
-    // The FileSystem::getPath(...) is part of the GitHub repository so we can find files on any IDE/platform; replace it with your own image path.
     unsigned char *data = stbi_load(path, &width, &height, &nrChannels, 0);
     if (data)
     {
@@ -87,14 +77,11 @@ unsigned int getTexture(const char* path){
 }
 
 int main() {
-
-    // start GL context and O/S window using the GLFW helper library
     if (!glfwInit()) {
     fprintf(stderr, "ERROR: could not start GLFW3\n");
     return 1;
     } 
 
-    // uncomment these lines if on Apple OS X
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
@@ -113,19 +100,11 @@ int main() {
 
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
                                     
-    // start GLEW extension handler
     glewExperimental = GL_TRUE;
     glewInit();
 
-    // get version info
-    const GLubyte* renderer = glGetString(GL_RENDERER); // get renderer string
-    const GLubyte* version = glGetString(GL_VERSION); // version as a string
-    printf("Renderer: %s\n", renderer);
-    printf("OpenGL version supported %s\n", version);
-
-    // tell GL to only draw onto a pixel if the shape is closer to the viewer
-    glEnable(GL_DEPTH_TEST); // enable depth-testing
-    glDepthFunc(GL_LESS); // depth-testing interprets a smaller value as "closer"
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glEnable(GL_STENCIL_TEST);
@@ -155,7 +134,6 @@ int main() {
     glGenVertexArrays(1, &PauseVAO);
     glGenBuffers(1, &PauseVBO);
     glGenBuffers(1, &PauseEBO);
-    // bind the Vertex Array Object first, then bind and set vertex buffer(s), and then configure vertex attributes(s).
     glBindVertexArray(PauseVAO);
 
     glBindBuffer(GL_ARRAY_BUFFER, PauseVBO);
@@ -167,7 +145,6 @@ int main() {
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
 
-    // note that this is allowed, the call to glVertexAttribPointer registered VBO as the vertex attribute's bound vertex buffer object so afterwards we can safely unbind
     glBindBuffer(GL_ARRAY_BUFFER, 0); 
 
 
@@ -200,8 +177,7 @@ int main() {
     Shader moonShader("moonvs.txt", "moonfs.txt");
     Shader particleShader("particlevs.txt", "particlefs.txt");
     Shader borderShader("modelvs.txt", "borderfs.txt");
-    Shader moonBorder("moonvs.txt", "borderfs.txt");
-
+    
     Model cottageModel(filesystem::path("assets/cottage/cottage.obj"));
     Model treeModel(filesystem::path("assets/tree/Tree.obj"));
     Model mountainModel(filesystem::path("assets/mountain/mountainpeak.obj"));
@@ -216,7 +192,6 @@ int main() {
     ParticleGroup particleGroup(fireColor, particlePos, 50);
     glm::mat4 projection = glm::mat4(1.0f);
     projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-    MousePicker picker(camera, projection, window, SCR_HEIGHT, SCR_WIDTH);
 
     glm::vec3 identity = glm::vec3(1.0f);
     for(int i=0; i<4; i++) {
@@ -225,7 +200,7 @@ int main() {
 
 
     while(!glfwWindowShouldClose(window)) {
-        //background colours
+
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glStencilMask(~0);
         glDisable(GL_SCISSOR_TEST);
@@ -238,7 +213,6 @@ int main() {
         lastFrame = currentFrame;
 
         processInput(window);
-        picker.update();
         glm::mat4 view = camera.GetViewMatrix();
 
         // 1. cursor position in Screen Space
@@ -262,50 +236,10 @@ int main() {
         glm::vec4 ray_wor4 = (inverse(view) * ray_eye);
         glm::vec3 ray_wor = glm::vec3(ray_wor4.x, ray_wor4.y, ray_wor4.z);
         ray_wor = glm::normalize(ray_wor);
-        // cout << "inline: " << glm::to_string(ray_wor) << endl;
 
         interSectedObject = objectIntersection(ray_wor);
-        // cout << interSectedObject << std::endl;
 
-        // Model shaders & translations & drawing
-        
-        // cout << glm::to_string(view) << '\n';
         glm::mat4 model = glm::mat4(1.0f);
-        
-        if(objectIntersection(ray_wor)==MOON ) {
-            glStencilFunc(GL_ALWAYS, 1, 0xFF); 
-            glStencilMask(0xFF);
-            moonShader.use();
-            glBindTexture(GL_TEXTURE_2D, moonTexture);
-            moonShader.setMat4("projection", projection);    
-            moonShader.setMat4("view", view);        
-            model = glm::translate(model, lightPos);
-            moonShader.setMat4("model", model);
-            moonModel.Draw(moonShader);
-
-            glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
-            glStencilMask(0x00);
-            glDisable(GL_DEPTH_TEST); 
-            scale = 1.1f;
-            moonBorder.use();
-            model = glm::scale(model, glm::vec3(scale, scale, scale));
-            moonBorder.setMat4("model", model);
-            moonBorder.setMat4("view", view);
-            moonBorder.setMat4("projection", projection);
-            moonModel.Draw(moonBorder);
-            glStencilFunc(GL_ALWAYS, 1, 0x00);   
-            glEnable(GL_DEPTH_TEST);  
-        }
-        else {
-            moonShader.use();
-            glBindTexture(GL_TEXTURE_2D, moonTexture);
-            moonShader.setMat4("projection", projection);    
-            moonShader.setMat4("view", view);        
-            model = glm::translate(model, lightPos);
-            moonShader.setMat4("model", model);
-            moonModel.Draw(moonShader);
-        }
-
         glm::vec3 diffuseColor = moonlight * glm::vec3(1.0f);
         glm::vec3 ambientColor = diffuseColor * glm::vec3(0.9f);
         modelShader.use();
@@ -331,42 +265,14 @@ int main() {
         modelShader.setVec3("light.diffuse", diffuseColor);
         modelShader.setVec3("light.specular", 1.0f, 1.0f, 1.0f);
 
-        //campfire material properties
-        modelShader.setVec3("material.ambient", 0.3f, 0.3f, 0.3f);
-        modelShader.setVec3("material.diffuse", 0.6f, 0.6f, 0.6f);
-        modelShader.setVec3("material.specular", 0.1f, 0.1f, 0.1f); // specular lighting doesn't have full effect on this object's material
-        modelShader.setFloat("material.shininess", 8.0f);
-        
-        model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(-4.0f, 0.2f, -4.0f));
-        modelShader.setMat4("model", model);
-        campfireModel.Draw(modelShader);
-
-        //reindeer material Properties //12 Meshes
         modelShader.setVec3("material.ambient", 0.2f, 0.2f, 0.2f);
         modelShader.setVec3("material.diffuse", 0.5f, 0.5f, 0.5f);
-        modelShader.setVec3("material.specular", 0.1f, 0.1f, 0.1f); // specular lighting doesn't have full effect on this object's material
+        modelShader.setVec3("material.specular", 0.1f, 0.1f, 0.1f);
         modelShader.setFloat("material.shininess", 4.0f);
 
-        modelShader.use();
-        model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 2.0f));
-        modelShader.setMat4("model", model);
-        reindeerModel.meshes[0].Draw(modelShader);
-
-        glm::mat4 childModel = glm::mat4(1.0f);
-        //childModel = model;
-
-        childModel = glm::translate(childModel, glm::vec3(0.0f, 1.0f, 0.0f));
-        childModel = glm::rotate(childModel, ((float)glfwGetTime())/2, glm::vec3(-1.0f, 0.0f, 0.0f));
-        childModel = glm::translate(childModel, glm::vec3(0.0f, -1.0f, 0.0f));
-
-        modelShader.setMat4("model", childModel);
-        reindeerModel.meshes[7].Draw(modelShader);
-        // tree material properties
         modelShader.setVec3("material.ambient", 0.2f, 0.2f, 0.2f);
         modelShader.setVec3("material.diffuse", 0.5f, 0.5f, 0.5f);
-        modelShader.setVec3("material.specular", 0.2f, 0.2f, 0.2f); // specular lighting doesn't have full effect on this object's material
+        modelShader.setVec3("material.specular", 0.2f, 0.2f, 0.2f);
         modelShader.setFloat("material.shininess", 16.0f);
 
         for(float i=-10; i<=11; i+=3) {
@@ -425,13 +331,11 @@ int main() {
             treeModel.Draw(modelShader);
         }
 
-        //come back to texturing mountains
         glBindTexture(GL_TEXTURE_2D, snowyMountain);
 
-        //Mountain material properties
         modelShader.setVec3("material.ambient", 0.2f, 0.2f, 0.2f);
         modelShader.setVec3("material.diffuse", 0.5f, 0.5f, 0.5f);
-        modelShader.setVec3("material.specular", 0.8f, 0.8f, 0.8f); // specular lighting doesn't have full effect on this object's material
+        modelShader.setVec3("material.specular", 0.8f, 0.8f, 0.8f);
         modelShader.setFloat("material.shininess", 48.0f);
 
         for(float i=-22.0f; i<=22; i+=11) {
@@ -470,21 +374,6 @@ int main() {
             mountainModel.Draw(modelShader);
         }
 
-
-        // material properties for cottage and bird
-        // same for no reason at all
-        modelShader.setVec3("material.ambient", 0.2f, 0.2f, 0.2f);
-        modelShader.setVec3("material.diffuse", 0.5f, 0.5f, 0.5f);
-        modelShader.setVec3("material.specular", 0.5f, 0.5f, 0.8f); // specular lighting doesn't have full effect on this object's material
-        modelShader.setFloat("material.shininess", 48.0f);
-
-        model = glm::mat4(1.0f);
-        model = glm::scale(model, glm::vec3(0.075f, 0.075f, 0.075f));
-        model = glm::translate(model, glm::vec3(0.0f, -12.0f, 140.0f));
-        modelShader.setMat4("model", model);
-        cottageModel.Draw(modelShader);
-
-        // ground shaders & translations & drawing
         groundShader.use();
 
         glBindTexture(GL_TEXTURE_2D, snowTexture);
@@ -512,10 +401,9 @@ int main() {
 
         groundShader.setVec3("viewPos", camera.Position);
 
-        //snow material Properties
         groundShader.setVec3("material.ambient", 0.1f, 0.1f, 0.1f);
         groundShader.setVec3("material.diffuse", 0.4f, 0.4f, 0.4f);
-        groundShader.setVec3("material.specular", 0.0f, 0.0f, 0.0f); // specular lighting doesn't have full effect on this object's material
+        groundShader.setVec3("material.specular", 0.0f, 0.0f, 0.0f);
         groundShader.setFloat("material.shininess", 12.0f);
         
         groundShader.setVec3("light.direction", -0.2f, -1.0f, -0.3f);
@@ -527,8 +415,6 @@ int main() {
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
         glBindVertexArray(0);
 
-        //drawing particle, right now just a big cube
-
         particleShader.use();
         
         particleShader.setMat4("view", view);
@@ -536,43 +422,78 @@ int main() {
 
         particleGroup.Draw(particleShader, cameraEnabled, timeBeforePause);
 
+        borderShader.use();
+        borderShader.setMat4("view", view);
+        borderShader.setMat4("projection", projection);
+
+        modelShader.use();
+        modelShader.setVec3("material.ambient", 0.3f, 0.3f, 0.3f);
+        modelShader.setVec3("material.diffuse", 0.6f, 0.6f, 0.6f);
+        modelShader.setVec3("material.specular", 0.1f, 0.1f, 0.1f); // specular lighting doesn't have full effect on this object's material
+        modelShader.setFloat("material.shininess", 8.0f);
+        
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(-4.0f, 0.2f, -4.0f));
+        modelShader.setMat4("model", model);
+        if(objectIntersection(ray_wor) == CAMPFIRE) {
+            scale = 1.01f;
+            highlightObject(model, campfireModel, modelShader, scale, borderShader);
+        }
+        else {
+            campfireModel.Draw(modelShader);
+        }
+
+        model = glm::mat4(1.0f);
+        moonShader.use();
+        model = glm::translate(model, lightPos);
+        moonShader.setMat4("model", model);
+        moonShader.setMat4("projection", projection);    
+        moonShader.setMat4("view", view);   
+        glBindTexture(GL_TEXTURE_2D, moonTexture);
+        if(objectIntersection(ray_wor)==MOON ) {
+            scale = 1.1f;
+            highlightObject(model, moonModel, moonShader, scale, borderShader);
+        }
+        else {
+            moonModel.Draw(moonShader);
+        }
+        
+        modelShader.use();
+        modelShader.setVec3("material.ambient", 0.2f, 0.2f, 0.2f);
+        modelShader.setVec3("material.diffuse", 0.5f, 0.5f, 0.5f);
+        modelShader.setVec3("material.specular", 0.5f, 0.5f, 0.8f); // specular lighting doesn't have full effect on this object's material
+        modelShader.setFloat("material.shininess", 48.0f);
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, cottagePos);
+        model = glm::scale(model, glm::vec3(0.075f, 0.075f, 0.075f));
+        modelShader.setMat4("model", model);
+
+        if(objectIntersection(ray_wor) == CABIN && cameraEnabled == true) {
+            scale = 1.05f;
+            highlightObject(model, cottageModel, modelShader, scale, borderShader);
+        }
+        else {
+            cottageModel.Draw(modelShader);
+        }
+ 
+
         for(float i=0; i<=9; i+=3) {
             model = glm::mat4(1.0f);
             model = glm::translate(model, glm::vec3(0.0f, -1.0f, -5.0f));
-            reindeerPos[i/3] = glm::vec3(cos(((float)glfwGetTime()+i)/2)*3.5, 0.0f, (sin(((float)glfwGetTime()+i)/2)*3.5)-5.0f);
-            if(cameraEnabled == true) {// && objectIntersection(ray_wor) == REINDEER) {
+            if(cameraEnabled == true) {
+                reindeerPos[i/3] = glm::vec3(cos(((float)glfwGetTime()+i)/2)*3.5, 0.0f, (sin(((float)glfwGetTime()+i)/2)*3.5)-5.0f);
+                modelShader.use();
+                model = glm::translate(model, glm::vec3(cos(((float)glfwGetTime()+i)/2)*3.5, 0.0f, sin(((float)glfwGetTime()+i)/2)*3.5));
+                model = glm::rotate(model, glm::radians(180.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+                model = glm::rotate(model, ((float)glfwGetTime()+i)/2, glm::vec3(0.0f, -1.0f, 0.0f));
+                modelShader.setMat4("model", model);
                 if(objectIntersection(ray_wor) == (i/3)+1) {
-                    glStencilFunc(GL_ALWAYS, 1, 0xFF); 
-                    glStencilMask(0xFF);
-                    modelShader.use();
-                    model = glm::translate(model, glm::vec3(cos(((float)glfwGetTime()+i)/2)*3.5, 0.0f, sin(((float)glfwGetTime()+i)/2)*3.5));
-                    model = glm::rotate(model, glm::radians(180.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-                    model = glm::rotate(model, ((float)glfwGetTime()+i)/2, glm::vec3(0.0f, -1.0f, 0.0f));
-                    modelShader.setMat4("model", model);
-                    reindeerModel.Draw(modelShader);
-                    glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
-                    glStencilMask(0x00);
-                    glDisable(GL_DEPTH_TEST); 
                     scale = 1.05f;
-                    borderShader.use();
-                    model = glm::scale(model, glm::vec3(scale, scale, scale));
-                    borderShader.setMat4("model", model);
-                    borderShader.setMat4("view", view);
-                    borderShader.setMat4("projection", projection);
-                    reindeerModel.Draw(borderShader);
-                    glStencilMask(0xFF);
-                    glStencilFunc(GL_ALWAYS, 1, 0xFF);   
-                    glEnable(GL_DEPTH_TEST);  
+                    highlightObject(model, reindeerModel, modelShader, scale, borderShader);
                 }
                 else {
-                    modelShader.use();
-                    model = glm::translate(model, glm::vec3(cos(((float)glfwGetTime()+i)/2)*3.5, 0.0f, sin(((float)glfwGetTime()+i)/2)*3.5));
-                    model = glm::rotate(model, glm::radians(180.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-                    model = glm::rotate(model, ((float)glfwGetTime()+i)/2, glm::vec3(0.0f, -1.0f, 0.0f));
-                    modelShader.setMat4("model", model);
                     reindeerModel.Draw(modelShader);
                 }
-
             }
             else {
                 modelShader.use();
@@ -587,42 +508,68 @@ int main() {
 
         if(cameraEnabled == false) {
             pauseShader.use();
-            glBindVertexArray(PauseVAO); // seeing as we only have a single VAO there's no need to bind it every time, but we'll do so to keep things a bit more organized
+            glBindVertexArray(PauseVAO);
             glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
             glm::mat4 nullView = glm::mat4(1.0f);
             glm::mat4 nullProj = glm::mat4(1.0f);
+            modelShader.use();
+            modelShader.setMat4("projection", nullProj);
+            modelShader.setMat4("view", nullView);
+            model = glm::mat4(1.0f);
 
             if(interSectedObject <=4) {
-                model = glm::mat4(1.0f);
                 model = glm::scale(model, glm::vec3(0.3f, 0.3f, 0.3f));
                 model = glm::translate(model, glm::vec3(0.0f, -1.0f, -1.0f));
                 model = glm::rotate(model, ((float)glfwGetTime())/2, glm::vec3(0.0f, 1.0f, 0.0f));
-                modelShader.use();
-                modelShader.setMat4("view", nullView);
                 modelShader.setMat4("model", model);
-                modelShader.setMat4("projection", nullProj);
                 reindeerModel.Draw(modelShader);
             }
-            else if(interSectedObject == 5) {
+            else if(interSectedObject == CABIN) {
+                model = glm::scale(model, glm::vec3(0.014f, 0.014f, 0.014f));
+                model = glm::translate(model, glm::vec3(0.0f, -22.0f, 0.0f));
+                model = glm::rotate(model, ((float)glfwGetTime())/2, glm::vec3(0.0f, 1.0f, 0.0f));
+                modelShader.setMat4("model", model);
+                cottageModel.Draw(modelShader);
+            }
+            else if(interSectedObject == CAMPFIRE) {
+                model = glm::scale(model, glm::vec3(0.5f, 0.5f, 0.5f));
+                model = glm::translate(model, glm::vec3(-4.0f, 1.0f, 0.0f));
+                modelShader.setMat4("model", model);
+                campfireModel.Draw(modelShader);
+            }
+            else if(interSectedObject == MOON) {
                 moonShader.use();
                 glBindTexture(GL_TEXTURE_2D, moonTexture); 
-                model = glm::mat4(1.0f);
-                //model = glm::scale(model, glm::vec3(0.3f, 0.3f, 0.3f));
-                model = glm::translate(model, glm::vec3(0.0f, -1.0f, -1.0f));
-                //model = glm::rotate(model, ((float)glfwGetTime())/2, glm::vec3(0.0f, 1.0f, 0.0f));
+                model = glm::scale(model, glm::vec3(0.3f, 0.3f, 0.3f));
+                model = glm::rotate(model, ((float)glfwGetTime())/2, glm::vec3(0.0f, 1.0f, 0.0f));
                 moonShader.setMat4("model", model);
+                moonShader.setMat4("projection", nullProj);
+                moonShader.setMat4("view", nullView);
                 moonModel.Draw(moonShader);
             }
-
         }
-
         glfwSwapBuffers(window);
         glfwPollEvents();
 }
 
-    // close GL context and any other GLFW resources
     glfwTerminate();
     return 0;
+}
+
+void highlightObject(glm::mat4 model, Model object, Shader shader, float scale, Shader borderShader) {
+    glStencilFunc(GL_ALWAYS, 1, 0xFF); 
+    glStencilMask(0xFF);
+    object.Draw(shader);
+    glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+    glStencilMask(0x00);
+    glDisable(GL_DEPTH_TEST);
+    borderShader.use();
+    model = glm::scale(model, glm::vec3(scale, scale, scale));
+    borderShader.setMat4("model", model);
+    object.Draw(borderShader);
+    glStencilMask(0xFF);
+    glStencilFunc(GL_ALWAYS, 1, 0xFF);   
+    glEnable(GL_DEPTH_TEST);  
 }
 
 bool intersection(glm::vec3 center, float radius, glm::vec3 ray) {
@@ -641,9 +588,13 @@ float intersectionPoint(glm::vec3 center, float radius, glm::vec3 ray) {
     float B = 2*(ray.x)*(origin.x-center.x)+2*(ray.y)*(origin.y-center.y)+2*(ray.z)*(origin.z-center.z);
     float C = (origin.x-center.x)*(origin.x-center.x)+(origin.y-center.y)*(origin.y-center.y)+(origin.z-center.z)*(origin.z-center.z)-(radius*radius);
     float d = (B*B)-(4*C);
-    float t1 = (-B+sqrt(d))/2;
-    float t2 = (-B-sqrt(d))/2;
-    return min(t1,t2);
+    if(d > 0) {
+        float t1 = (-B+sqrt(d))/2;
+        float t2 = (-B-sqrt(d))/2;
+        return min(t1,t2);
+    }
+    return -1;
+
 }
 
 struct Item {
@@ -660,15 +611,34 @@ int objectIntersection(glm::vec3 ray) {
     int minIndex =0;
     if(intersection(lightPos, 2, ray)) {
         t = intersectionPoint(lightPos, 2, ray);
-        item.index = MOON;
-        item.val = t;
-        list.push_back(item);
+        if(t >0) {
+            item.index = MOON;
+            item.val = t;
+            list.push_back(item);
+        }
     }
-    //ReindeerIntersection
     for(int i=0; i<reindeerPos.size(); i++) {
         if(intersection(reindeerPos[i], 2, ray)) {
             t = intersectionPoint(reindeerPos[i], 2, ray);
-            item.index = i+1;
+            if(t >0) {
+                item.index = i+1;
+                item.val = t;
+                list.push_back(item);
+            }
+        }
+    }
+    if(intersection(cottagePos, 4, ray)) {
+        t = intersectionPoint(cottagePos, 4, ray);
+        if(t >0) {
+            item.index = CABIN;
+            item.val = t;
+            list.push_back(item);
+        }
+    }
+    if(intersection(glm::vec3(campfirePos.x,campfirePos.y-1.5f, campfirePos.z), 0.2, ray)) {
+        t = intersectionPoint(glm::vec3(campfirePos.x,campfirePos.y-1.5f, campfirePos.z), 0.2, ray);
+        if(t >0) {
+            item.index = CAMPFIRE;
             item.val = t;
             list.push_back(item);
         }
@@ -712,7 +682,7 @@ void processInput(GLFWwindow *window)
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 {
     if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
-        cout << interSectedObject << std::endl;
+        // cout << interSectedObject << std::endl;
         if(cameraEnabled == true && interSectedObject !=0) {
             cameraEnabled = false;
             timeBeforePause = (float)glfwGetTime();
